@@ -1,30 +1,19 @@
 package simgo
 
 import (
-	"container/heap"
 	"log"
+	"os"
 
 	"testing"
 )
 
-func TestHeap(t *testing.T) {
-	h := &workerHeap{}
-	heap.Init(h)
-	heap.Push(h, &worker{nil, 2})
-	heap.Push(h, &worker{nil, 1})
-	heap.Push(h, &worker{nil, 3})
+var (
+	verbose = false
+)
 
-	if h.Len() != 3 {
-		t.Fatalf("wrong size (%d != 3)", h.Len())
-	}
-
-	w := heap.Pop(h).(*worker)
-	if h.Len() != 2 {
-		t.Fatalf("wrong size (%d != 2)", h.Len())
-	}
-
-	if w.time != 1 {
-		t.Fatalf("bad time (%d != 1)", w.time)
+func init() {
+	if len(os.Getenv("SIMGO_VERBOSE")) > 0 {
+		verbose = true
 	}
 }
 
@@ -52,7 +41,9 @@ func newTestWorker(id int, t *testing.T) *testWorker {
 		for {
 			tick := <-tw.ch
 			tw.ticks = append(tw.ticks, tick)
-			t.Logf("[%d] at %d\n", tw.id, tick)
+			if verbose {
+				t.Logf("[%d] at %d\n", tw.id, tick)
+			}
 			tw.ch <- (tw.id + 1) * 10
 		}
 	}()

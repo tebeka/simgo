@@ -61,12 +61,27 @@ func (env *Env) Run(until int) {
 			return
 		}
 		env.now = w.time
-		w.job.In() <- env.now
-		// We assume currently only sleep is sent back
-		t := <-w.job.Out()
-		if t > 0 {
-			w.time += t
-			heap.Push(env.wh, w)
+		var batch []*worker
+		// Start all ones for this time slot at the same time
+		// (e.g. Don't wait for one to finish before starting another)
+		for {
+			w.job.In() <- env.now
+			batch = append(batch, w)
+			if env.wh.Len() == 0 {
+				break
+			}
+			if (*env.wh)[0].time != env.now {
+				break
+			}
+			w = heap.Pop(env.wh).(*worker)
+		}
+
+		for _, w := range batch {
+			dt := <-w.job.Out()
+			if dt > 0 {
+				w.time += dt
+				heap.Push(env.wh, w)
+			}
 		}
 	}
 }

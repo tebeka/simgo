@@ -17,23 +17,23 @@ func init() {
 	}
 }
 
-type testWorker struct {
+type testProcess struct {
 	env   *Env
 	ch    chan int
 	id    int
 	ticks []int
 }
 
-func (tw *testWorker) In() InChan {
+func (tw *testProcess) In() InChan {
 	return tw.ch
 }
 
-func (tw *testWorker) Out() OutChan {
+func (tw *testProcess) Out() OutChan {
 	return tw.ch
 }
 
-func newTestWorker(id int, t *testing.T) *testWorker {
-	tw := &testWorker{
+func newTestProcess(id int, t *testing.T) *testProcess {
+	tw := &testProcess{
 		ch: make(chan int),
 		id: id,
 	}
@@ -65,17 +65,17 @@ func sliceEq(a, b []int) bool {
 
 func TestProcess(t *testing.T) {
 	env := NewEnv()
-	tw := newTestWorker(0, t)
+	tw := newTestProcess(0, t)
 
 	env.Process(tw)
 }
 
 func TestRun(t *testing.T) {
 	env := NewEnv()
-	workers := make([]*testWorker, 3)
+	procs := make([]*testProcess, 3)
 	for i := 0; i < 3; i++ {
-		workers[i] = newTestWorker(i, t)
-		env.Process(workers[i])
+		procs[i] = newTestProcess(i, t)
+		env.Process(procs[i])
 	}
 	until := 100
 	env.Run(until)
@@ -91,8 +91,8 @@ func TestRun(t *testing.T) {
 	}
 
 	for i, slice := range expected {
-		if !sliceEq(workers[i].ticks, slice) {
-			t.Fatalf("bad ticks for %d: %v\n", i, workers[i].ticks)
+		if !sliceEq(procs[i].ticks, slice) {
+			t.Fatalf("bad ticks for %d: %v\n", i, procs[i].ticks)
 		}
 	}
 }

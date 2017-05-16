@@ -1,3 +1,4 @@
+// simgo is discreet event simulation framework
 package simgo
 
 import (
@@ -8,19 +9,21 @@ var (
 	Version = "0.1.0"
 )
 
-type InChan chan int
-type OutChan chan int
+type InChan chan int  // Process input channel
+type OutChan chan int // Process output channel
 
-type Worker interface {
-	In() InChan
-	Out() OutChan
+// Process interface
+type Process interface {
+	In() InChan   // Input channel, receives time
+	Out() OutChan // Output channel, send sleep time in ticks, -1 for done
 }
 
 type worker struct {
-	job  Worker
+	proc Process
 	time int
 }
 
+// container/heap interface
 type workerHeap []*worker
 
 func (h workerHeap) Len() int           { return len(h) }
@@ -39,45 +42,59 @@ func (h *workerHeap) Pop() interface{} {
 	return x
 }
 
+// Simulation environment
 type Env struct {
 	wh  *workerHeap
 	now int
 }
 
+// NewEnv returns a new environment
 func NewEnv() *Env {
 	return &Env{&workerHeap{}, 0}
 }
 
-func (env *Env) Process(w Worker) {
-	wk := &worker{job: w, time: env.now}
+// Process adds a process to the simulation
+func (env *Env) Process(w Process) {
+	wk := &worker{proc: w, time: env.now}
 	heap.Push(env.wh, wk)
 }
 
+// batch returns batch of processes to start now
+func (env *Env) batch(time int) []*worker {
+	var batch []*worker
+	for env.nextTick() == time {
+		w := heap.Pop(env.wh).(*worker)
+		batch = append(batch, w)
+	}
+	return batch
+}
+
+// nextTick return next tick to jump to
+func (env *Env) nextTick() int {
+	if env.wh.Len() == 0 {
+		return -1
+	}
+	return (*env.wh)[0].time
+}
+
+// Run runs the simulation
 func (env *Env) Run(until int) {
 	for env.wh.Len() > 0 {
-		w := heap.Pop(env.wh).(*worker)
-		if w.time > until {
+		now := env.nextTick()
+		if now > until {
 			env.now = until
 			return
 		}
-		env.now = w.time
-		var batch []*worker
-		// Start all ones for this time slot at the same time
-		// (e.g. Don't wait for one to finish before starting another)
-		for {
-			w.job.In() <- env.now
-			batch = append(batch, w)
-			if env.wh.Len() == 0 {
-				break
-			}
-			if (*env.wh)[0].time != env.now {
-				break
-			}
-			w = heap.Pop(env.wh).(*worker)
+		env.now = now
+		batch := env.batch(now)
+		// Start all
+		for _, w := range batch {
+			w.proc.In() <- now
 		}
 
+		// Wait, if worker return positive number - it's sleep time
 		for _, w := range batch {
-			dt := <-w.job.Out()
+			dt := <-w.proc.Out()
 			if dt > 0 {
 				w.time += dt
 				heap.Push(env.wh, w)
@@ -86,6 +103,7 @@ func (env *Env) Run(until int) {
 	}
 }
 
+// Now returns the current tick
 func (env *Env) Now() int {
 	return env.now
 }

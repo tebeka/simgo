@@ -8,8 +8,12 @@ var (
 	Version = "0.1.0"
 )
 
+type InChan chan int
+type OutChan chan int
+
 type Worker interface {
-	Chan() chan int
+	In() InChan
+	Out() OutChan
 }
 
 type worker struct {
@@ -53,13 +57,20 @@ func (env *Env) Run(until int) {
 	for env.wh.Len() > 0 {
 		w := heap.Pop(env.wh).(*worker)
 		if w.time > until {
-			break
+			env.now = until
+			return
 		}
 		env.now = w.time
-		w.job.Chan() <- env.now
-		w.time = <-w.job.Chan()
-		if w.time > 0 {
+		w.job.In() <- env.now
+		// We assume currently only sleep is sent back
+		t := <-w.job.Out()
+		if t > 0 {
+			w.time += t
 			heap.Push(env.wh, w)
 		}
 	}
+}
+
+func (env *Env) Now() int {
+	return env.now
 }
